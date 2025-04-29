@@ -1,0 +1,79 @@
+//@version=5
+indicator("Multi-Timeframe ATR Candle Classification", overlay=true)
+
+// پارامترهای ورودی برای دوره‌های ATR در تایم‌فریم‌های مختلف
+input int ATR_Period_M1 = 24    // ATR Period for M1
+input int ATR_Period_M5 = 24    // ATR Period for M5
+input int ATR_Period_M15 = 24   // ATR Period for M15
+input int ATR_Period_H1 = 24    // ATR Period for H1
+input int ATR_Period_H4 = 30    // ATR Period for H4
+input int ATR_Period_D1 = 22    // ATR Period for D1
+input int ATR_Period_W1 = 52    // ATR Period for W1
+input int ATR_Period_MN1 = 12   // ATR Period for MN1
+
+// آستانه‌های ATR
+input float ATR_Threshold1 = 0.07  // آستانه 7% برای کندل‌های اسپینینگ تاپ
+input float ATR_Threshold2 = 0.14  // آستانه 14% برای کندل‌های استاندارد
+input float ATR_Threshold3 = 0.25  // آستانه 25% برای کندل‌های انگالفینگ
+
+// تابع محاسبه ATR برای تایم‌فریم‌های مختلف
+getATR(tf) =>
+    atrValue = request.security(syminfo.tickerid, tf, ta.atr(tf == "1" ? ATR_Period_M1 : 
+                                                             tf == "5" ? ATR_Period_M5 :
+                                                             tf == "15" ? ATR_Period_M15 :
+                                                             tf == "60" ? ATR_Period_H1 :
+                                                             tf == "240" ? ATR_Period_H4 :
+                                                             tf == "D" ? ATR_Period_D1 :
+                                                             tf == "W" ? ATR_Period_W1 :
+                                                             ATR_Period_MN1))
+    atrValue
+
+// محاسبه ATR برای تایم‌فریم جاری
+currentTF = timeframe.period
+currentATR = getATR(currentTF)
+
+// محاسبه مشخصات کندل
+bodySize = math.abs(close - open)
+upperShadow = high - math.max(open, close)
+lowerShadow = math.min(open, close) - low
+
+// دسته‌بندی کندل‌ها
+isSpinningTop = (bodySize < currentATR * ATR_Threshold1) and 
+               (upperShadow > currentATR * ATR_Threshold2) and 
+               (lowerShadow > currentATR * ATR_Threshold2)
+
+isStandard = (bodySize >= currentATR * ATR_Threshold1) and 
+            (bodySize < currentATR * ATR_Threshold2)
+
+isEngulfingBar = (bodySize >= currentATR * ATR_Threshold2) and 
+                (bodySize < currentATR * ATR_Threshold3)
+
+isStrongTrendBar = bodySize >= currentATR * ATR_Threshold3
+
+// تشخیص 3 کندل استاندارد متوالی
+threeStandardInRow = isStandard and isStandard[1] and isStandard[2]
+
+// نمایش فلش سیگنال
+plotshape(threeStandardInRow and not threeStandardInRow[1], 
+         style=shape.triangleup, 
+         location=location.belowbar, 
+         color=color.new(color.green, 0), 
+         size=size.small, 
+         title="3 Standard Candles Signal")
+
+// رنگ‌آمیزی کندل‌ها بر اساس نوع
+barcolor(isSpinningTop ? color.new(color.purple, 70) : 
+        isStandard ? color.new(color.blue, 70) : 
+        isEngulfingBar ? color.new(color.orange, 70) : 
+        isStrongTrendBar ? color.new(color.red, 70) : na)
+
+// نمایش اطلاعات روی کندل‌ها
+var table infoTable = table.new(position.top_right, 1, 1)
+if barstate.islast
+    table.cell(infoTable, 0, 0, "Timeframe: " + currentTF + "\n" +
+               "ATR: " + str.tostring(currentATR, "#.##") + "\n" +
+               "Spinning Top: " + str.tostring(isSpinningTop) + "\n" +
+               "Standard: " + str.tostring(isStandard) + "\n" +
+               "Engulfing: " + str.tostring(isEngulfingBar) + "\n" +
+               "Strong Trend: " + str.tostring(isStrongTrendBar),
+               text_color=color.white)
