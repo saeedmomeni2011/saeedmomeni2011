@@ -7,7 +7,6 @@
 #property link      "https://www.metaquotes.net/"
 #property version   "1.00"
 #property strict
-#property script_show_inputs
 
 //+------------------------------------------------------------------+
 //| Input Variables                                                  |
